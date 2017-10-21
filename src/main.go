@@ -2,7 +2,7 @@ package main
 
 import (
   "net/http"
-  "time"
+  // "time"
   "log"
   "github.com/gorilla/websocket"
   "github.com/rakyll/portmidi"
@@ -11,26 +11,29 @@ import (
 var upgrader = websocket.Upgrader{}
 
 func main() {
-  portmidi.Initialize()
-  deviceID := portmidi.DefaultOutputDeviceID()
-  out, err := portmidi.NewOutputStream(deviceID, 1024, 0)
+  err := portmidi.Initialize()
   if err != nil {
-      log.Fatal(err)
+    log.Fatal(err)
+  }
+  defer portmidi.Terminate()
+
+  // deviceID := portmidi.DefaultInputDeviceID(0)
+  // var deviceID = *portmidi.DeviceID{0}
+  // println("info:", portmidi.Info(1).IsInputAvailable)
+  midi, err := portmidi.NewInputStream(1, 1024)
+  if err != nil {
+    println("whoops")
+    return
+  } else {
+    // go func() {
+      events := midi.Listen()
+      println(events)
+      for event := range events {
+        println(event.Timestamp)
+      }
+    // }()
   }
 
-  // note on events to play C major chord
-  out.WriteShort(0x90, 60, 100)
-  out.WriteShort(0x90, 64, 100)
-  out.WriteShort(0x90, 67, 100)
-
-  time.Sleep(2 * time.Second)
-
-  // note off events
-  out.WriteShort(0x80, 60, 100)
-  out.WriteShort(0x80, 64, 100)
-  out.WriteShort(0x80, 67, 100)
-
-  out.Close()
   // in, err := portmidi.NewInputStream(deviceID, 1024)
   // if err != nil {
   //   println("error: %s", err)
