@@ -6,5 +6,14 @@
 </head>
 <body>
   <h1>GSM</h1>
+  <script>
+    (function() {
+      var ws = new WebSocket("ws://localhost:7000/ws")
+      ws.addEventListener("message", function(e) {
+        var data = JSON.parse(e.data)
+        console.log(data)
+      })
+    })()
+  </script>
 </body>
 </html>

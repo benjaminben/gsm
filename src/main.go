@@ -2,13 +2,13 @@ package main
 
 import (
   "net/http"
-  // "time"
   "log"
   "github.com/gorilla/websocket"
   "github.com/rakyll/portmidi"
 )
 
 var upgrader = websocket.Upgrader{}
+var events = []portmidi.Event{}
 
 func main() {
   err := portmidi.Initialize()
@@ -22,113 +22,36 @@ func main() {
   // println("info:", portmidi.Info(1).IsInputAvailable)
   midi, err := portmidi.NewInputStream(1, 1024)
   if err != nil {
-    println("whoops")
+    log.Fatal("whoops couldn't forge midi stream:", err)
     return
-  } else {
-    // go func() {
-      events := midi.Listen()
-      println(events)
-      for event := range events {
-        println(event.Timestamp)
-      }
-    // }()
   }
-
-  // in, err := portmidi.NewInputStream(deviceID, 1024)
-  // if err != nil {
-  //   println("error: %s", err)
-  //   return
-  // }
-  // defer in.Close()
-
-  // events, err := in.Read(1024)
-  // if err != nil {
-  //   // log.Fatal(err)
-  //   println("ewps: %s", err)
-  //   return
-  // }
-  // println(events)
-
-  // ch := in.Listen()
-  // event := <-ch
 
   http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
     http.ServeFile(w, r, "index.html")
   })
 
-  http.HandleFunc("/v1/ws", func(w http.ResponseWriter, r *http.Request) {
+  http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
     var conn, _ = upgrader.Upgrade(w, r, nil)
     go func(conn *websocket.Conn) {
-      for {
-        mType, msg, err := conn.ReadMessage()
-        if err != nil {
-          return
-        }
-
-        conn.WriteMessage(mType, msg)
+      events := midi.Listen()
+      for event := range events {
+        // if (event.Status < 208 || event.Status > 223) {
+        //   // don't log Mono Key Pressure events...
+          conn.WriteJSON(midiGsm{
+            Status: event.Status,
+            Data1: event.Data1,
+            Data2: event.Data2,
+          })
+        // }
       }
     }(conn)
   })
 
-  // http.HandleFunc("/v2/ws", func(w http.ResponseWriter, r *http.Request) {
-  //   var conn, _ = upgrader.Upgrade(w, r, nil)
-  //   go func(conn *websocket.Conn) {
-  //     for {
-  //       _, msg, err := conn.ReadMessage()
-  //       if err != nil {
-  //         return
-  //       }
-  //       println(string(msg))
-  //     }
-  //   }(conn)
-  // })
-
-  // http.HandleFunc("/v3/ws", func(w http.ResponseWriter, r *http.Request) {
-  //   var conn, _ = upgrader.Upgrade(w, r, nil)
-  //   go func(conn *websocket.Conn) {
-  //     ch := time.Tick(5 *time.Second)
-
-  //     for range ch {
-  //       conn.WriteJSON(myGsm{
-  //         Username: "bmb",
-  //         FirstName: "Ben",
-  //         LastName: "Benjamin",
-  //       })
-  //     }
-
-  //   }(conn)
-  // })
-
-  // http.HandleFunc("/v4/ws", func(w http.ResponseWriter, r *http.Request) {
-  //   var conn, _ = upgrader.Upgrade(w, r, nil)
-  //   go func(conn *websocket.Conn) {
-  //     for {
-  //       _, _, err := conn.ReadMessage()
-  //       if err != nil {
-  //         conn.Close()
-  //       }
-  //     }
-  //   }(conn)
-
-  //   go func(conn *websocket.Conn) {
-  //     ch := time.Tick(5 *time.Second)
-
-  //     for range ch {
-  //       conn.WriteJSON(myGsm{
-  //         Username: "bmb",
-  //         FirstName: "Ben",
-  //         LastName: "Benjamin",
-  //       })
-  //     }
-
-  //   }(conn)
-  // })
-
   http.ListenAndServe(":7000", nil)
 }
 
-type myGsm struct {
-  Username string `json:"username"`
-  FirstName string `json:"firstName"`
-  LastName string `json:"lastName"`
+type midiGsm struct {
+  Status int64 `json:"status"`
+  Data1 int64 `json:"data1"`
+  Data2 int64 `json:"data2"`
 }
